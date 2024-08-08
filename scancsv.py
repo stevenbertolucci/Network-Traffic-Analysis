@@ -76,7 +76,6 @@ for pkt in CSVPackets(csvfile):
 
     # Count the IP address usage
     ip_counts[pkt.ipsrc] += 1
-    # ip_counts[pkt.ipdst] += 1
 
     # Extract and count /24 network prefixes
     src_prefix = '.'.join(pkt.ipsrc.split('.')[:3]) + '.0/24'
@@ -101,9 +100,9 @@ for pkt in CSVPackets(csvfile):
                 service = f"udp/{pkt.udpdport}"
                 service_connections[pkt.ipdst][service].add(f"{pkt.ipsrc}-{pkt.udpsport:05d}")
 
-# If user included the '-stats' flag in the command line, print this only
+# 1. If user included the '-stats' flag in the command line, print this only
 if show_stats:
-    print("numPackets:%u numBytes:%u" % (numPackets, numBytes))
+    print("\nnumPackets:%u numBytes:%u" % (numPackets, numBytes))
     for i in range(256):
         if IPProtos[i] != 0:
             print("%3u: %9u" % (i, IPProtos[i]))
@@ -120,26 +119,28 @@ if show_stats:
         if count > 0:
             print("Port %u: %u packets" % (port, count))
 
-# 3: Printing out the most popular IP addresses
-if count_ip:
-    print("IP Address Usage Counts:")
-    sorted_ip_counts = sorted(ip_counts.items(), key=lambda x: x[1], reverse=True)
-    for ip, count in sorted_ip_counts:
-        print(f"IP Address {ip}: {count} packets")
+# 3: Printing out the most popular IP addresses if user entered '-countip' flag
+if count_ip or gre_flag or ipsec_flag or ospf_flag:
 
-# 3. Determine and print the dominant network prefixes
-print("\nNetwork Prefix Usage Counts:")
-sorted_prefix_counts = sorted(prefix_counts.items(), key=lambda x: x[1], reverse=True)
-for prefix, count in sorted_prefix_counts:
-    print(f"Network Prefix {prefix}: {count} packets")
+    if count_ip:
+        print("\nIP Address Usage Counts:")
+        sorted_ip_counts = sorted(ip_counts.items(), key=lambda x: x[1], reverse=True)
+        for ip, count in sorted_ip_counts:
+            print(f"IP Address {ip}: {count} packets")
 
-# 7. Identify and print secondary network prefixes associated with the filtered traffic
-if protocol_filter is not None:
-    print("\nSecondary Network Prefixes Associated with Protocol Traffic:")
+    # 5. Determine and print the dominant network prefixes if user entered the '-countip' flag
+    print("\nNetwork Prefix Usage Counts:")
+    sorted_prefix_counts = sorted(prefix_counts.items(), key=lambda x: x[1], reverse=True)
     for prefix, count in sorted_prefix_counts:
-        # Exclude the most dominant prefix
-        if count > 0 and prefix != sorted_prefix_counts[0][0]:
-            print(f"Network Prefix {prefix}: {count} packets")
+        print(f"Network Prefix {prefix}: {count} packets")
+
+    # 7. Identify and print secondary network prefixes associated with the filtered traffic
+    if protocol_filter:
+        print("\nSecondary Network Prefixes Associated with Protocol Traffic:")
+        for prefix, count in sorted_prefix_counts:
+            # Exclude the most dominant prefix
+            if count > 0 and prefix != sorted_prefix_counts[0][0]:
+                print(f"Network Prefix {prefix}: {count} packets")
 
 # 9. Print connections to services if -connto flag is set
 if count_connections:
