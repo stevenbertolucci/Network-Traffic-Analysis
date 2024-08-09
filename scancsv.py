@@ -41,7 +41,6 @@ for port in range(1, 1025):
     tcp_port_counts[port] = 0
     udp_port_counts[port] = 0
 
-
 ip_counts = defaultdict(int)        # Dictionary to count IP address usage
 prefix_counts = defaultdict(int)    # Dictionary to count network prefix usage
 service_connections = defaultdict(lambda: defaultdict(set))     # Dictionary to track connections to each service
