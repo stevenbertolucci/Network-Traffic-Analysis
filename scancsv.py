@@ -7,6 +7,11 @@ from CSVPacket import Packet, CSVPackets
 from collections import defaultdict
 import sys
 
+# For debugging purposes
+# print(sys.argv[0])
+# print(sys.argv[1])
+# print(sys.argv[2])
+
 # Check for the flags
 show_stats = '-stats' in sys.argv
 count_ip = '-countip' in sys.argv
@@ -17,6 +22,7 @@ count_connections = '-connto' in sys.argv
 
 # Determine the protocol filter based on the flags
 protocol_filter = None
+
 if gre_flag:
     protocol_filter = 47  # GRE (Generic Routing Encapsulation)
 elif ipsec_flag:
@@ -29,22 +35,16 @@ numBytes = 0
 numPackets = 0
 
 # Initialize counts for well-known ports (1-1024) for TCP and UDP
-tcp_port_counts = {port: 0 for port in range(1, 1025)}
-udp_port_counts = {port: 0 for port in range(1, 1025)}
+tcp_port_counts = {}
+udp_port_counts = {}
+for port in range(1, 1025):
+    tcp_port_counts[port] = 0
+    udp_port_counts[port] = 0
 
-# For debugging purposes
-# print(sys.argv[0])
-# print(sys.argv[1])
-# print(sys.argv[2])
 
-# Dictionary to count IP address usage
-ip_counts = defaultdict(int)
-
-# Dictionary to count network prefix usage
-prefix_counts = defaultdict(int)
-
-# Dictionary to track connections to each service
-service_connections = defaultdict(lambda: defaultdict(set))
+ip_counts = defaultdict(int)        # Dictionary to count IP address usage
+prefix_counts = defaultdict(int)    # Dictionary to count network prefix usage
+service_connections = defaultdict(lambda: defaultdict(set))     # Dictionary to track connections to each service
 
 # Find the CSV file argument
 csv_filename = None
@@ -64,11 +64,12 @@ csvfile = open(sys.argv[1], 'r')
 # Iterate through the file headers
 for pkt in CSVPackets(csvfile):
     # pkt.__str__ is defined...
-    # print pkt
+    # print(pkt)
     numBytes += pkt.length
     numPackets += 1
     proto = pkt.proto & 0xff
     IPProtos[proto] += 1
+    # print(IPProtos)
 
     # 6. Apply protocol filter if specified i.e. if user entered the flags '-gre', '-ipsec', 'ospf'
     if protocol_filter is not None and proto != protocol_filter:
@@ -79,6 +80,7 @@ for pkt in CSVPackets(csvfile):
 
     # Extract and count /24 network prefixes
     src_prefix = '.'.join(pkt.ipsrc.split('.')[:3]) + '.0/24'
+    # print(src_prefix)
     prefix_counts[src_prefix] += 1
 
     # Check for TCP (protocol number 6) and UDP (protocol number 17) and count them
@@ -124,29 +126,51 @@ if count_ip or gre_flag or ipsec_flag or ospf_flag:
 
     if count_ip:
         print("\nIP Address Usage Counts:")
-        sorted_ip_counts = sorted(ip_counts.items(), key=lambda x: x[1], reverse=True)
-        for ip, count in sorted_ip_counts:
+        # print(ip_counts.items())
+
+        # Convert the dictionary to a list of tuples
+        ip_count_list = list(ip_counts.items())
+
+        # Sort the list based on the count (second item in the tuple)
+        # Using a simple loop approach
+        ip_count_list.sort(key=lambda item: item[1], reverse=True)
+
+        # Print the sorted list
+        for ip, count in ip_count_list:
             print(f"IP Address {ip}: {count} packets")
 
     # 5. Determine and print the dominant network prefixes if user entered the '-countip' flag
     print("\nNetwork Prefix Usage Counts:")
-    sorted_prefix_counts = sorted(prefix_counts.items(), key=lambda x: x[1], reverse=True)
-    for prefix, count in sorted_prefix_counts:
+
+    # Convert the prefix_counts dictionary to a list of tuples
+    prefix_count_list = list(prefix_counts.items())
+
+    # Sort the list based on the count
+    prefix_count_list.sort(key=lambda item: item[1], reverse=True)
+
+    # Print the sorted list
+    for prefix, count in prefix_count_list:
         print(f"Network Prefix {prefix}: {count} packets")
 
     # 7. Identify and print secondary network prefixes associated with the filtered traffic
     if protocol_filter:
         print("\nSecondary Network Prefixes Associated with Protocol Traffic:")
-        for prefix, count in sorted_prefix_counts:
-            # Exclude the most dominant prefix
-            if count > 0 and prefix != sorted_prefix_counts[0][0]:
-                print(f"Network Prefix {prefix}: {count} packets")
+
+        if prefix_count_list:
+            most_dominant_prefix = prefix_count_list[0][0]  # The most dominant prefix
+            for prefix, count in prefix_count_list:
+
+                # Exclude the most dominant prefix
+                if count > 0 and prefix != most_dominant_prefix:
+                    print(f"Network Prefix {prefix}: {count} packets")
 
 # 9. Print connections to services if -connto flag is set
 if count_connections:
     print("\nConnections to Services:")
     for ipdst, services in service_connections.items():
         distinct_ipsrc_ports = set()
+
         for service, src_ports in services.items():
             distinct_ipsrc_ports.update(src_ports)
+
         print(f"{ipdst} has {len(distinct_ipsrc_ports)} distinct ipsrc on ports: {', '.join(services.keys())}")
